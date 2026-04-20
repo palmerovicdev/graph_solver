@@ -79,7 +79,7 @@ class _GraphViewPageState extends State<GraphViewPage> {
       ..._cloneGroupMap(_tGroups),
     };
     _recomputeAdjacencyAndGraph();
-    _refreshColors();
+    _refreshColors(firstTime: true);
   }
 
   void _recomputeAdjacencyAndGraph() {
@@ -133,7 +133,12 @@ class _GraphViewPageState extends State<GraphViewPage> {
     return out;
   }
 
-  void _refreshColors() {
+  void _refreshColors({bool firstTime = false}) {
+    if (firstTime) {
+      _colors = <String, Color>{};
+      _errorMessage = '';
+      return;
+    }
     _normalizeSelectedMethodForListConstraints();
     try {
       _colors = _buildColors(_selectedColoringMethod);
@@ -300,7 +305,7 @@ class _GraphViewPageState extends State<GraphViewPage> {
     }
 
     final colorIndexByNode = switch (method) {
-      ColoringMethod.greedy => _colorateWithGreedy(_adjacency),
+      ColoringMethod.greedy => _colorateWithGreedy(_adjacency, visitOrder: ['B', 'A', 'H', 'F', 'I', 'E', 'D', 'C', 'G']),
       ColoringMethod.dsatur => _colorateWithDsatur(_adjacency),
       ColoringMethod.backtracking => _colorateWithBacktracking(_adjacency),
       ColoringMethod.greedyForLists => _colorateWithGreedyForLists(
