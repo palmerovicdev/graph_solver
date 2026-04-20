@@ -74,10 +74,7 @@ class _GraphViewPageState extends State<GraphViewPage> {
   @override
   void initState() {
     super.initState();
-    _ruleGroups = {
-      ..._cloneGroupMap(_gGroups),
-      ..._cloneGroupMap(_tGroups),
-    };
+    _ruleGroups = {..._cloneGroupMap(_gGroups), ..._cloneGroupMap(_tGroups)};
     _recomputeAdjacencyAndGraph();
     _refreshColors(firstTime: true);
   }
@@ -232,9 +229,7 @@ class _GraphViewPageState extends State<GraphViewPage> {
 
     for (var i = 0; i < labels.length; i++) {
       final label = labels[i];
-      final angle = labels.length <= 1
-          ? 0.0
-          : 2 * math.pi * i / labels.length;
+      final angle = labels.length <= 1 ? 0.0 : 2 * math.pi * i / labels.length;
       final node = Node<String>(label);
       node.position.x = radius * math.cos(angle);
       node.position.y = radius * math.sin(angle);
@@ -305,8 +300,14 @@ class _GraphViewPageState extends State<GraphViewPage> {
     }
 
     final colorIndexByNode = switch (method) {
-      ColoringMethod.greedy => _colorateWithGreedy(_adjacency, visitOrder: ['B', 'A', 'H', 'F', 'I', 'E', 'D', 'C', 'G']),
-      ColoringMethod.dsatur => _colorateWithDsatur(_adjacency),
+      ColoringMethod.greedy => _colorateWithGreedy(
+        _adjacency,
+        visitOrder: ['B', 'A', 'H', 'F', 'I', 'E', 'D', 'C', 'G'],
+      ),
+      ColoringMethod.dsatur => _colorateWithDsatur(
+        _adjacency,
+        visitOrder: ['B', 'A', 'H', 'F', 'I', 'E', 'D', 'C', 'G'],
+      ),
       ColoringMethod.backtracking => _colorateWithBacktracking(_adjacency),
       ColoringMethod.greedyForLists => _colorateWithGreedyForLists(
         _adjacency,
@@ -375,7 +376,8 @@ class _GraphViewPageState extends State<GraphViewPage> {
                     if (_usesListColoringConstraints) ...[
                       MethodButton(
                         label: 'Greedy',
-                        selected: _selectedColoringMethod ==
+                        selected:
+                            _selectedColoringMethod ==
                             ColoringMethod.greedyForLists,
                         onPressed: () => _changeColoringMethod(
                           ColoringMethod.greedyForLists,
@@ -383,7 +385,8 @@ class _GraphViewPageState extends State<GraphViewPage> {
                       ),
                       MethodButton(
                         label: 'Backtracking',
-                        selected: _selectedColoringMethod ==
+                        selected:
+                            _selectedColoringMethod ==
                             ColoringMethod.backtrackingForLists,
                         onPressed: () => _changeColoringMethod(
                           ColoringMethod.backtrackingForLists,
@@ -406,7 +409,8 @@ class _GraphViewPageState extends State<GraphViewPage> {
                       ),
                       MethodButton(
                         label: 'Backtracking',
-                        selected: _selectedColoringMethod ==
+                        selected:
+                            _selectedColoringMethod ==
                             ColoringMethod.backtracking,
                         onPressed: () =>
                             _changeColoringMethod(ColoringMethod.backtracking),
