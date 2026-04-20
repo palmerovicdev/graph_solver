@@ -412,6 +412,196 @@ Proponer una implementación computacional para al menos uno de los algoritmos p
 
 #### Ejecución
 
+``` Dart
+Map<T, int> call(Map<T, Set<T>> adjacency, {List<T>? visitOrder}) {
+    final normalized = _normalizeUndirectedAdjacency(adjacency);
+    if (normalized.isEmpty) {
+      return <T, int>{};
+    }
+
+    print('visitOrder: $visitOrder');
+    print('normalized: $normalized');
+
+    final priorityByNode = _buildPriorityByNode(normalized, visitOrder);
+    final colorByNode = <T, int>{};
+    final uncolored = normalized.keys.toSet();
+    final saturationByNode = <T, Set<int>>{
+      for (final node in normalized.keys) node: <int>{},
+    };
+
+    while (uncolored.isNotEmpty) {
+      final node = _pickNextNode(
+        uncolored,
+        normalized,
+        saturationByNode,
+        priorityByNode,
+      );
+      final usedColors = <int>{};
+
+      for (final neighbor in normalized[node] ?? <T>{}) {
+        final color = colorByNode[neighbor];
+        if (color != null) {
+          usedColors.add(color);
+        }
+      }
+
+      var selectedColor = 0;
+      while (usedColors.contains(selectedColor)) {
+        selectedColor++;
+      }
+
+      colorByNode[node] = selectedColor;
+      uncolored.remove(node);
+
+      for (final neighbor in normalized[node] ?? <T>{}) {
+        if (uncolored.contains(neighbor)) {
+          saturationByNode[neighbor]!.add(selectedColor);
+        }
+      }
+    }
+
+    return colorByNode;
+  }
+
+  /// Pick the next node to color based on saturation and degree.
+  T _pickNextNode(
+    Set<T> uncolored,
+    Map<T, Set<T>> adjacency,
+    Map<T, Set<int>> saturationByNode,
+    Map<T, int> priorityByNode,
+  ) {
+    final nodes = uncolored.toList()
+      ..sort((a, b) {
+        final saturationComparison = saturationByNode[b]!.length.compareTo(
+          saturationByNode[a]!.length,
+        );
+        if (saturationComparison != 0) {
+          return saturationComparison;
+        }
+
+        final degreeComparison = adjacency[b]!.length.compareTo(
+          adjacency[a]!.length,
+        );
+        if (degreeComparison != 0) {
+          return degreeComparison;
+        }
+
+        final priorityA = priorityByNode[a];
+        final priorityB = priorityByNode[b];
+        if (priorityA != null && priorityB != null) {
+          final priorityComparison = priorityA.compareTo(priorityB);
+          if (priorityComparison != 0) {
+            return priorityComparison;
+          }
+        } else if (priorityA != null) {
+          return -1;
+        } else if (priorityB != null) {
+          return 1;
+        }
+
+        return a.toString().compareTo(b.toString());
+      });
+
+    return nodes.first;
+  }
+
+  Map<T, int> _buildPriorityByNode(
+    Map<T, Set<T>> adjacency,
+    List<T>? visitOrder,
+  ) {
+    if (visitOrder == null) {
+      return <T, int>{};
+    }
+
+    final priorityByNode = <T, int>{};
+    for (var i = 0; i < visitOrder.length; i++) {
+      final node = visitOrder[i];
+      if (!adjacency.containsKey(node)) {
+        continue;
+      }
+      priorityByNode.putIfAbsent(node, () => i);
+    }
+
+    return priorityByNode;
+  }
+
+  /// Normalize undirected adjacency graph to ensure all nodes are connected.
+  Map<T, Set<T>> _normalizeUndirectedAdjacency(Map<T, Set<T>> adjacency) {
+    final normalized = <T, Set<T>>{};
+
+    for (final entry in adjacency.entries) {
+      normalized.putIfAbsent(entry.key, () => <T>{});
+      for (final neighbor in entry.value) {
+        if (neighbor == entry.key) {
+          continue;
+        }
+        normalized.putIfAbsent(neighbor, () => <T>{});
+        normalized[entry.key]!.add(neighbor);
+        normalized[neighbor]!.add(entry.key);
+      }
+    }
+
+    return normalized;
+  }
 ```
 
-```
+
+## Solución a preguntas guía:
+
+### Pregunta 1
+¿Cómo se construye el grafo de conflictos a partir de datos de clases?
+
+#### Ejecución
+La pregunta queda resuelta y demostrada en la solución de la **Tarea 1**.
+
+### Pregunta 2
+¿Cuál es el número mínimo de bloques requerido para un conjunto de clases dado?
+
+#### Ejecución
+La respuesta se encuentra en la **Tarea 5**, donde se explica el número cromático `x(G)` como mínimo de bloques de tiempo.
+
+Para el caso de la Tabla 1, el mínimo es **4 bloques**.
+
+### Pregunta 3
+¿Qué algoritmo de coloreo produce soluciones de mejor calidad (menos bloques) bajo el mismo tiempo de cómputo?
+
+#### Ejecución
+Con los datos usados en este documento, **Greedy** y **DSATUR** alcanzan una solución válida con **4 bloques**.
+
+En general, **DSATUR** suele producir soluciones de mejor calidad (igual o menos colores que Greedy en muchos casos), pero con mayor costo computacional en esta implementación.
+
+### Pregunta 4
+¿Cómo se valida que el horario resultante no contiene conflictos?
+
+#### Ejecución
+Un horario es válido si para toda arista `(u, v)` del grafo se cumple que `color(u) != color(v)`.
+
+Esto significa que dos clases en conflicto (mismo grupo o mismo docente) nunca quedan asignadas al mismo bloque.
+
+### Pregunta 5
+¿En una implementación computacional qué estructura de datos es adecuada para representar los datos del grafo de conflictos?
+
+#### Ejecución
+La estructura adecuada y usada en esta implementación es una **lista de adyacencia**:
+
+`Map<T, Set<T>> adjacency`
+
+Permite:
+
+- consultar vecinos de cada nodo de forma eficiente,
+- recorrer aristas para validar conflictos,
+- aplicar algoritmos como Greedy y DSATUR de manera directa.
+
+### Pregunta 6
+Cómo se quiere obtener un óptimo minimal sobre el número de bloques de tiempo, ¿cómo saber si ya obtuvo tal valor óptimo?
+
+#### Ejecución
+La respuesta conceptual se encuentra en la **Tarea 5** (criterios con número cromático y clique máximo).
+
+En práctica, se confirma el óptimo cuando:
+
+1. Se obtiene una coloración válida con `k` bloques.
+2. Se demuestra que no existe coloración válida con `k - 1` bloques.
+3. Además, se puede usar un límite inferior como el tamaño del clique máximo para reforzar la prueba.
+
+### Pregunta 7
