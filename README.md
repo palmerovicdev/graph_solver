@@ -405,3 +405,13 @@ Como el proceso se repite para todos los nodos:
 Por lo tanto, la complejidad total de esta implementación es:
 
 `O(n^2 log n + m)`
+
+### Tarea 6
+
+Proponer una implementación computacional para al menos uno de los algoritmos propuestos para el caso general de resolver conflictos mediante el coloreo grafos.
+
+#### Ejecución
+
+```
+
+```

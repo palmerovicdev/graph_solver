@@ -302,11 +302,11 @@ class _GraphViewPageState extends State<GraphViewPage> {
     final colorIndexByNode = switch (method) {
       ColoringMethod.greedy => _colorateWithGreedy(
         _adjacency,
-        visitOrder: ['B', 'A', 'H', 'F', 'I', 'E', 'D', 'C', 'G'],
+        visitOrder: _buildCustomVisitOrder,
       ),
       ColoringMethod.dsatur => _colorateWithDsatur(
         _adjacency,
-        visitOrder: ['B', 'A', 'H', 'F', 'I', 'E', 'D', 'C', 'G'],
+        visitOrder: _buildCustomVisitOrder,
       ),
       ColoringMethod.backtracking => _colorateWithBacktracking(_adjacency),
       ColoringMethod.greedyForLists => _colorateWithGreedyForLists(
@@ -323,6 +323,15 @@ class _GraphViewPageState extends State<GraphViewPage> {
       final color = _colorForIndex(colorIndex);
       return MapEntry(node, color);
     });
+  }
+
+  List<String> get _buildCustomVisitOrder {
+    final order = {'B', 'A', 'H', 'F', 'I', 'E', 'D', 'C', 'G'};
+    final nodes = _adjacency.keys.toSet();
+    // If the order has the same nodes as the selected ones, return the order, otherwise return an empty list.
+    return order.intersection(nodes).length == nodes.length
+        ? order.toList()
+        : [];
   }
 
   Color _colorForIndex(int colorIndex) {

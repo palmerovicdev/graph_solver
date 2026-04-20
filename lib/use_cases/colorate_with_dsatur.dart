@@ -7,6 +7,9 @@ class ColorateWithDsatur<T> {
       return <T, int>{};
     }
 
+    print('visitOrder: $visitOrder');
+    print('normalized: $normalized');
+
     final priorityByNode = _buildPriorityByNode(normalized, visitOrder);
     final colorByNode = <T, int>{};
     final uncolored = normalized.keys.toSet();

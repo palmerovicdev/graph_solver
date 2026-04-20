@@ -7,6 +7,9 @@ class ColorateWithGreedy<T> {
       return <T, int>{};
     }
 
+    print('visitOrder: $visitOrder');
+    print('normalized: $normalized');
+
     final order = _buildVisitOrder(normalized, visitOrder);
     final colorByNode = <T, int>{};
 
