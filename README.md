@@ -93,277 +93,13 @@ Al analizar el problema, vemos que se parece mucho al **coloreo de grafos**. Eso
    - Branch and Cut
    - Branch and Price
 
-#### Demostración
+#### Modelado como grafo de conflictos
 
-Queremos probar que **3-COLORING es NP-completo**.
-
-Para eso hacen falta dos cosas:
-
-1. Probar que **3-COLORING pertenece a NP**.
-2. Probar que **3-COLORING es NP-Hard**.
-
-La segunda parte se demuestra con una reducción polinomial desde **3-SAT** hacia **3-COLORING**:
-
-3-SAT <=p 3-COLORING
-
-Es decir, dada una fórmula booleana phi en 3-CNF, construiremos un grafo G_phi tal que:
-
-phi es satisfacible si y solo si G_phi es 3-coloreable.
-
-Ref: `Chekuri & Pitt, 2015, p. 5`
-
-##### 1. 3-COLORING pertenece a NP
-
-Dado un grafo G y una propuesta de coloreo con 3 colores, se puede verificar en tiempo polinomial que el coloreo es válido:
-
-- se revisa cada arista (u, v)
-- se comprueba que u y v tengan colores distintos
-
-Eso toma tiempo polinomial en el tamaño del grafo.
-
-Por tanto, **3-COLORING pertenece a NP**.
-
-##### 2. Idea general de la reducción
-
-Partimos de una fórmula phi de 3-SAT con:
-
-- variables x1, x2, ..., xn
-- cláusulas C1, C2, ..., Cm
-
-Vamos a construir un grafo G_phi usando exactamente 3 colores conceptuales:
-
-- T = True
-- F = False
-- B = Base
-
-La construcción debe forzar dos cosas:
-
-1. que cada variable tome exactamente uno de los valores True o False
-2. que cada cláusula tenga al menos un literal verdadero
-
-Si logramos eso, entonces una 3-coloración válida del grafo equivale a una asignación satisfactoria de phi.
-
-###### Gadget base: el triángulo T, F, B
-
-Primero se crea un triángulo con tres nodos:
-
-- T
-- F
-- B
-
-Como forman un triángulo, en cualquier 3-coloración válida deben recibir tres colores distintos.
-
-Entonces esos tres nodos fijan la paleta completa de colores del resto de la construcción.
-
-A partir de ese momento interpretamos:
-
-- color de T = verdadero
-- color de F = falso
-- color de B = base
-
-```
-      T --- F
-       \   /
-        \ /
-         B
-```
-
-###### Gadget de variable
-
-Para cada variable xi se crean dos nodos:
-
-- vi  (representa xi)
-- not_vi (representa no xi)
-
-Y se conectan así:
-
-- vi con not_vi
-- vi con B
-- not_vi con B
-
-Eso forma un triángulo **(vi, not_vi, B)** con aristas **vi–not_vi**, **vi–B** y **not_vi–B**.
-
-```
-   T ----------- F
-    \           /
-     \         /
-      \       /
-       \     /
-        \   /
-         \ /
-          B
-         / \
-        /   \
-       /     \
-    vi ------- not_vi
-```
-
-**¿Qué fuerza este gadget?**
-
-Como **vi** y **not_vi** están conectados a **B**, ninguno de los dos puede tomar el color de **B**.
-
-Por tanto, cada uno solo puede tomar uno de estos dos colores (los que ya tienen **T** y **F** en una 3-coloración válida del triángulo base):
-
-- el color de **T**
-- el color de **F**
-
-Además, como **vi** y **not_vi** están conectados entre sí, no pueden tener el mismo color.
-
-Entonces obligatoriamente:
-
-- uno queda con el color de **T**
-- el otro queda con el color de **F**
-
-Eso codifica una asignación de verdad coherente para la variable **xi**.
-
-**Interpretación:**
-
-- si **vi** tiene el color de **T**, entonces **xi** = verdadero
-- si **vi** tiene el color de **F**, entonces **xi** = falso
-
-Y automáticamente su negación queda con el valor contrario.
-
-###### Gadget de cláusula
-
-Ahora hay que forzar que cada cláusula sea satisfecha.
-
-Si una cláusula es:
-
-Cj = (a or b or c)
-
-entonces las diapositivas construyen un gadget OR con:
-
-- tres nodos de entrada: a, b, c
-- varios nodos internos
-- un nodo de salida que representa a or b or c
-
-Este gadget tiene dos propiedades esenciales:
-
-**Propiedad 1**
-
-Si a, b y c están coloreados como False, entonces la salida del gadget también queda forzada a False.
-
-**Propiedad 2**
-
-Si al menos uno de a, b o c está coloreado como True, entonces el gadget sí puede 3-colorearse haciendo que la salida quede con color True.
-
-Estas dos propiedades son exactamente lo que necesitamos para representar una disyunción.
-
-###### Cómo se conecta el gadget de cláusula al resto del grafo
-
-Para cada cláusula Cj = (a or b or c):
-
-1. se construye el gadget OR con entradas a, b y c
-2. se toma el nodo de salida del gadget
-3. ese nodo de salida se conecta a:
-   - F
-   - B
-
-###### ¿Qué logra esto?
-
-Como la salida está conectada a F y a B, no puede usar ni el color F ni el color B.
-
-Por tanto, la salida queda forzada a usar el color T.
-
-Pero el gadget OR solo permite que la salida sea T si al menos una de las entradas a, b, c es T.
-
-Entonces queda forzado que en cada cláusula haya al menos un literal verdadero.
-
-Eso hace que cada cláusula sea satisfecha
-
-###### Construcción completa del grafo G_phi
-
-El grafo G_phi se construye así:
-
-1. Se crea el triángulo base con T, F y B.
-2. Para cada variable xi, se agrega su gadget de variable.
-3. Para cada cláusula Cj = (a or b or c), se agrega su gadget OR.
-4. La salida de cada gadget OR se conecta con F y con B.
-
-El tamaño del grafo resultante es polinomial en el tamaño de phi, porque:
-
-- por cada variable se añade una cantidad constante de nodos y aristas
-- por cada cláusula se añade una cantidad constante de nodos y aristas
-
-Por tanto, la transformación se puede hacer en tiempo polinomial.
-
-###### Correctitud de la reducción
-
-Ahora hay que demostrar la equivalencia:
-
-phi es satisfacible si y solo si G_phi es 3-coloreable.
-
-**(=>) Si phi es satisfacible, entonces G_phi es 3-coloreable**
-
-Supongamos que phi tiene una asignación satisfactoria.
-
-- Coloreamos T, F y B con tres colores distintos.
-- Para cada variable xi:
-  - si xi = verdadero, damos a vi el color T y a not_vi el color F
-  - si xi = falso, damos a vi el color F y a not_vi el color T
-
-Eso colorea correctamente todos los gadgets de variable.
-
-Ahora consideremos una cláusula Cj = (a or b or c).
-
-Como la asignación satisface phi, en cada cláusula al menos uno de los literales a, b o c es verdadero.
-
-Entonces, por la propiedad del gadget OR, ese gadget puede colorearse de modo que su salida tenga color T.
-
-Como esto vale para cada cláusula, todo el grafo G_phi queda 3-coloreado legalmente.
-
-Por tanto, G_phi es 3-coloreable.
-
-###### (<=) Si G_phi es 3-coloreable, entonces phi es satisfacible
-
-Supongamos ahora que G_phi admite una 3-coloración válida.
-
-- El triángulo T-F-B usa tres colores distintos.
-- En cada gadget de variable, vi y not_vi no pueden usar el color B y además deben tener colores distintos.
-- Por tanto, uno queda con T y el otro con F.
-
-Eso define una asignación booleana consistente para cada variable.
-
-Ahora miremos cualquier cláusula Cj = (a or b or c).
-
-La salida del gadget de cláusula está conectada a F y a B, así que no puede tomar esos colores.
-Entonces su color debe ser T.
-
-Pero por la propiedad del gadget OR, eso solo es posible si al menos una de las entradas a, b o c tiene color T.
-
-Por tanto, en cada cláusula al menos un literal es verdadero.
-
-Luego todas las cláusulas se satisfacen y phi es satisfacible.
-
-###### Conclusión
-
-Se ha construido en tiempo polinomial un grafo G_phi tal que:
-
-phi es satisfacible si y solo si G_phi es 3-coloreable.
-
-Por tanto:
-
-3-SAT <=p 3-COLORING
-
-Como 3-SAT es NP-completo, se concluye que **3-COLORING es NP-Hard**.
-
-Además, como 3-COLORING pertenece a NP, concluimos finalmente que:
-
-**3-COLORING es NP-completo.**
-
-#### Reducción a coloreo de grafos
-
-Luego de esta demostración, reducimos nuestro problema de asignación de bloques de clases a **coloreo de grafos** de la siguiente manera:
+Podemos reducir nuestro problema de asignación de bloques de clases a **coloreo de grafos** de la siguiente manera:
 
 - Cada clase se representa como un nodo en el grafo.
 - Se dibuja una arista de conflicto entre dos nodos si las clases comparten el **mismo grupo** o el **mismo docente**; así reflejamos que no pueden ocurrir en el **mismo bloque de tiempo**.
 - Colorear el grafo con **k** colores equivale a asignar a **k** bloques de tiempo de manera que no existan conflictos, cumpliendo así todas las restricciones.
-
-Por eso tiene sentido usar aquí los mismos algoritmos de coloreo (**heurísticos** y **exactos**) que vimos antes: si obtenemos un coloreo válido con **k** colores, ese resultado se lee directamente como un **horario sin conflictos** en **k** bloques.
-
-#### Modelado como grafo de conflictos
-
-El conjunto de clases de la Tabla 1 se representa como un **grafo no dirigido de conflictos**: hay arista entre dos clases si comparten **grupo** o **docente**. Para almacenarlo de forma compacta usamos **listas de adyacencia**: por cada vértice guardamos sus vecinos (en ambos sentidos, porque el grafo es no dirigido).
 
 **Vértices:** `A, B, C, D, E, F, G, H, I` (una clase por letra).
 
@@ -400,7 +136,10 @@ Aplicar un algoritmo Greedy (paso a paso), dibujando el grafo de conflictos gene
 
 #### Ejecución
 
-El **Greedy de coloreo** recorre los nodos en ese orden; al llegar a un nodo **v**, mira solo los **vecinos que ya quedaron coloreados** en pasos anteriores, anota los colores que usan y asigna a **v** el **menor color entero no usado** entre esos vecinos (típicamente empezando en **0**). Así cada paso es local y rápido, pero el resultado **depende del orden**: puede usar más colores que el óptimo aunque exista un coloreo con menos colores.
+El algoritmo `Greedy de coloreo` procesa los nodos uno por uno, siguiendo un orden fijo.
+Cuando le toca un nodo v, revisa cuáles de sus vecinos ya fueron coloreados en los pasos anteriores. Con esa información, identifica qué colores ya no puede usar, porque dos nodos adyacentes no pueden tener el mismo color.
+
+Después, entre todos los colores posibles, le asigna a v el color más pequeño que todavía esté libre; normalmente se empieza por 0, luego 1, después 2, y así sucesivamente.
 
 Orden de visita solicitado:
 
@@ -420,19 +159,62 @@ H -> B, E, G, I
 I -> C, F, G, H
 ```
 
-Pasos del algoritmo de coloreo:
+Paso a paso del algoritmo Greedy
 
-| Nodo | Colores de vecinos | Color asignado |
-| --- | --- | --- |
-| B | [] | 0 |
-| A | [0] | 1 |
-| H | [0] | 1 |
-| F | [] | 0 |
-| I | [0, 1] | 2 |
-| E | [0, 1] | 2 |
-| D | [0, 1, 2] | 3 |
-| C | [0, 1, 2] | 3 |
-| G | [1, 2, 3] | 0 |
+1. Paso 1:
+    - Nodos sin color: A, B, C, D, E, F, G, H, I
+    - Nodo seleccionado: B (siguiente en el orden fijo)
+    - Colores vecinos usados: []
+    - Color asignado: 0
+    - Asignación parcial: B:0
+2. Paso 2:
+    - Nodos sin color: A, C, D, E, F, G, H, I
+    - Nodo seleccionado: A
+    - Colores vecinos usados: [0] (vecino B ya coloreado)
+    - Color asignado: 1
+    - Asignación parcial: B:0, A:1
+3. Paso 3:
+    - Nodos sin color: C, D, E, F, G, H, I
+    - Nodo seleccionado: H
+    - Colores vecinos usados: [0] (vecino B ya coloreado)
+    - Color asignado: 1
+    - Asignación parcial: B:0, A:1, H:1
+4. Paso 4:
+    - Nodos sin color: C, D, E, F, G, I
+    - Nodo seleccionado: F
+    - Colores vecinos usados: []
+    - Color asignado: 0
+    - Asignación parcial: B:0, A:1, H:1, F:0
+5. Paso 5:
+    - Nodos sin color: C, D, E, G, I
+    - Nodo seleccionado: I
+    - Colores vecinos usados: [0, 1] (vecinos F y H ya coloreados)
+    - Color asignado: 2
+    - Asignación parcial: B:0, A:1, H:1, F:0, I:2
+6. Paso 6:
+    - Nodos sin color: C, D, E, G
+    - Nodo seleccionado: E
+    - Colores vecinos usados: [0, 1] (vecinos B, F y H ya coloreados; D aún sin color)
+    - Color asignado: 2
+    - Asignación parcial: B:0, A:1, H:1, F:0, I:2, E:2
+7. Paso 7:
+    - Nodos sin color: C, D, G
+    - Nodo seleccionado: D
+    - Colores vecinos usados: [0, 1, 2] (vecinos A, E y F ya coloreados)
+    - Color asignado: 3
+    - Asignación parcial: B:0, A:1, H:1, F:0, I:2, E:2, D:3
+8. Paso 8:
+    - Nodos sin color: C, G
+    - Nodo seleccionado: C
+    - Colores vecinos usados: [0, 1, 2] (vecinos A, B, F e I ya coloreados)
+    - Color asignado: 3
+    - Asignación parcial: B:0, A:1, H:1, F:0, I:2, E:2, D:3, C:3
+9. Paso 9:
+    - Nodo sin color: G
+    - Nodo seleccionado: G
+    - Colores vecinos usados: [1, 2, 3] (vecinos A, D, H e I ya coloreados)
+    - Color asignado: 0
+    - Asignación parcial: B:0, A:1, H:1, F:0, I:2, E:2, D:3, C:3, G:0
 
 Coloración final:
 
