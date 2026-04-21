@@ -61,84 +61,295 @@ Modelar el conjunto de clases como un grafo de conflictos a partir de restriccio
 
 #### Ejecución
 
-Al analizar el problema, podemos encontrar similitudes con **coloreo de grafos**. Dado que este último es un problema **NP-Completo**, es conveniente reducir nuestro problema a este. Esto nos permite obtener información relevante sobre su complejidad:
+Al analizar el problema, vemos que se parece mucho al **coloreo de grafos**. Eso nos sirve para entender que:
 
-- El hecho de que sea **NP** indica que existe una forma de **verificar rápidamente una solución candidata** en tiempo polinomial.
-- Al ser **NP-Hard**, no se conoce un algoritmo eficiente que garantice una solución exacta. Por ello, resulta recomendable usar **heurísticas** como **Greedy**, **DSATUR** o **Backtracking**, considerando su costo computacional.
+1. Es posible revisar en tiempo polinomial si una solución propuesta cumple las restricciones.
+
+    Para cada arista `(V1, V2)` comprobar que `C(V1) != C(V2)`.
+
+    En este problema eso significa que si dos clases están en conflicto entonces no pueden estar en el mismo bloque.
+    Para verificar la solución solo tendríamos que comprobar que no viola las restricciones del problema.
+
+    Para un grafo con `n` vértices y `m` aristas se hace:
+
+      - Leer la asignación de colores en cada vértice: `O(n)`.
+      - Recorrer cada arista y comparar los colores en sus extremos: `O(m)` (cada arista se revisa una vez).
+
+    En total la complejidad es **`O(n + m)`**. (En un grafo no dirigido la suma de los grados es `2m`, así que recorrer aristas equivale a `O(m)` en el conteo usual.)
+
+2. Encontrar siempre la mejor solución puede ser costoso. En la práctica suele usarse una heurística constructiva; para instancias pequeñas (o con suficiente tiempo y memoria) se pueden usar métodos exactos.
+
+   **Algunos métodos heurísticos o constructivos**
+
+   - DSATUR
+   - RLF
+   - Welsh-Powell
+   - Greedy
+
+   **Algunos métodos exactos**
+
+   - Backtracking
+   - Branch and Bound
+   - Branch and Cut
+   - Branch and Price
 
 #### Demostración
 
-Comenzamos demostrando que el **coloreo de grafos** es en efecto **NP-Hard**:
+Queremos probar que **3-COLORING es NP-completo**.
 
-#### Ejemplo visual
+Para eso hacen falta dos cosas:
 
-Consideremos la fórmula **3-SAT** pequeña:
+1. Probar que **3-COLORING pertenece a NP**.
+2. Probar que **3-COLORING es NP-Hard**.
 
-`phi = (x_1 U - x_2 U x_2) ^ (- x_1 U x_2 U x_1)`
+La segunda parte se demuestra con una reducción polinomial desde **3-SAT** hacia **3-COLORING**:
 
-**Paso 1: Triángulo base**
+3-SAT <=p 3-COLORING
+
+Es decir, dada una fórmula booleana phi en 3-CNF, construiremos un grafo G_phi tal que:
+
+phi es satisfacible si y solo si G_phi es 3-coloreable.
+
+Ref: `Chekuri & Pitt, 2015, p. 5`
+
+##### 1. 3-COLORING pertenece a NP
+
+Dado un grafo G y una propuesta de coloreo con 3 colores, se puede verificar en tiempo polinomial que el coloreo es válido:
+
+- se revisa cada arista (u, v)
+- se comprueba que u y v tengan colores distintos
+
+Eso toma tiempo polinomial en el tamaño del grafo.
+
+Por tanto, **3-COLORING pertenece a NP**.
+
+##### 2. Idea general de la reducción
+
+Partimos de una fórmula phi de 3-SAT con:
+
+- variables x1, x2, ..., xn
+- cláusulas C1, C2, ..., Cm
+
+Vamos a construir un grafo G_phi usando exactamente 3 colores conceptuales:
+
+- T = True
+- F = False
+- B = Base
+
+La construcción debe forzar dos cosas:
+
+1. que cada variable tome exactamente uno de los valores True o False
+2. que cada cláusula tenga al menos un literal verdadero
+
+Si logramos eso, entonces una 3-coloración válida del grafo equivale a una asignación satisfactoria de phi.
+
+###### Gadget base: el triángulo T, F, B
+
+Primero se crea un triángulo con tres nodos:
+
+- T
+- F
+- B
+
+Como forman un triángulo, en cualquier 3-coloración válida deben recibir tres colores distintos.
+
+Entonces esos tres nodos fijan la paleta completa de colores del resto de la construcción.
+
+A partir de ese momento interpretamos:
+
+- color de T = verdadero
+- color de F = falso
+- color de B = base
 
 ```
-B (BASE)
- /   \
-T     F
-```
-
-- T = VERDADERO
-- F = FALSO
-- B = BASE
-
-**Paso 2: Nodos de variables**
-
-- Variable \(x_1\): nodos \(x_1\) y \(-x_1\) conectados entre sí y a B
-- Variable \(x_2\): nodos \(x_2\) y \(-x_2\) conectados entre sí y a B
-
-```
-     x1 --- -x1
-      \     /
+      T --- F
        \   /
-         B
-     x2 --- -x2
-      \     /
-       \   /
+        \ /
          B
 ```
 
-**Paso 3: Nodos de cláusulas**
+###### Gadget de variable
 
-- Cláusula \(C_1 = (x_1 U -x_2 U x_2)\)
-- Cláusula \(C_2 = (-x_1 U x_2 U x_1)\)
+Para cada variable xi se crean dos nodos:
 
-- Cada nodo de cláusula está conectado a su literal correspondiente y al nodo BASE B
+- vi  (representa xi)
+- not_vi (representa no xi)
+
+Y se conectan así:
+
+- vi con not_vi
+- vi con B
+- not_vi con B
+
+Eso forma un triángulo **(vi, not_vi, B)** con aristas **vi–not_vi**, **vi–B** y **not_vi–B**.
 
 ```
-Nodos de C1: c11, c12, c13
-c11 -- x1
-c12 -- -x2
-c13 -- x2
-c11,c12,c13 -- B (triángulo)
-
-Nodos de C2: c21, c22, c23
-c21 -- -x1
-c22 -- x2
-c23 -- x1
-c21,c22,c23 -- B (triángulo)
+   T ----------- F
+    \           /
+     \         /
+      \       /
+       \     /
+        \   /
+         \ /
+          B
+         / \
+        /   \
+       /     \
+    vi ------- not_vi
 ```
+
+**¿Qué fuerza este gadget?**
+
+Como **vi** y **not_vi** están conectados a **B**, ninguno de los dos puede tomar el color de **B**.
+
+Por tanto, cada uno solo puede tomar uno de estos dos colores (los que ya tienen **T** y **F** en una 3-coloración válida del triángulo base):
+
+- el color de **T**
+- el color de **F**
+
+Además, como **vi** y **not_vi** están conectados entre sí, no pueden tener el mismo color.
+
+Entonces obligatoriamente:
+
+- uno queda con el color de **T**
+- el otro queda con el color de **F**
+
+Eso codifica una asignación de verdad coherente para la variable **xi**.
 
 **Interpretación:**
 
-- Para que los triángulos de cláusulas sean 3-coloreables, **al menos un literal debe ser VERDADERO**.
-- Esto asegura que la asignación de colores corresponde a una **solución satisfacible** de la fórmula 3-SAT.
+- si **vi** tiene el color de **T**, entonces **xi** = verdadero
+- si **vi** tiene el color de **F**, entonces **xi** = falso
 
-```
-VERDADERO = T
-FALSO      = F
-BASE       = B
-```
+Y automáticamente su negación queda con el valor contrario.
 
-- Asignando colores a los nodos de variables según una solución válida, podemos colorear todos los triángulos de cláusulas, demostrando la correspondencia con **3-SAT**.
+###### Gadget de cláusula
 
-Por lo tanto, el **coloreo de grafos** con \(k >= 3\) colores es **NP-Hard**, y como verificar un coloreo dado se hace en tiempo polinomial, también es **NP-Completo**.
+Ahora hay que forzar que cada cláusula sea satisfecha.
+
+Si una cláusula es:
+
+Cj = (a or b or c)
+
+entonces las diapositivas construyen un gadget OR con:
+
+- tres nodos de entrada: a, b, c
+- varios nodos internos
+- un nodo de salida que representa a or b or c
+
+Este gadget tiene dos propiedades esenciales:
+
+**Propiedad 1**
+
+Si a, b y c están coloreados como False, entonces la salida del gadget también queda forzada a False.
+
+**Propiedad 2**
+
+Si al menos uno de a, b o c está coloreado como True, entonces el gadget sí puede 3-colorearse haciendo que la salida quede con color True.
+
+Estas dos propiedades son exactamente lo que necesitamos para representar una disyunción.
+
+###### Cómo se conecta el gadget de cláusula al resto del grafo
+
+Para cada cláusula Cj = (a or b or c):
+
+1. se construye el gadget OR con entradas a, b y c
+2. se toma el nodo de salida del gadget
+3. ese nodo de salida se conecta a:
+   - F
+   - B
+
+###### ¿Qué logra esto?
+
+Como la salida está conectada a F y a B, no puede usar ni el color F ni el color B.
+
+Por tanto, la salida queda forzada a usar el color T.
+
+Pero el gadget OR solo permite que la salida sea T si al menos una de las entradas a, b, c es T.
+
+Entonces queda forzado que en cada cláusula haya al menos un literal verdadero.
+
+Eso hace que cada cláusula sea satisfecha
+
+###### Construcción completa del grafo G_phi
+
+El grafo G_phi se construye así:
+
+1. Se crea el triángulo base con T, F y B.
+2. Para cada variable xi, se agrega su gadget de variable.
+3. Para cada cláusula Cj = (a or b or c), se agrega su gadget OR.
+4. La salida de cada gadget OR se conecta con F y con B.
+
+El tamaño del grafo resultante es polinomial en el tamaño de phi, porque:
+
+- por cada variable se añade una cantidad constante de nodos y aristas
+- por cada cláusula se añade una cantidad constante de nodos y aristas
+
+Por tanto, la transformación se puede hacer en tiempo polinomial.
+
+###### Correctitud de la reducción
+
+Ahora hay que demostrar la equivalencia:
+
+phi es satisfacible si y solo si G_phi es 3-coloreable.
+
+**(=>) Si phi es satisfacible, entonces G_phi es 3-coloreable**
+
+Supongamos que phi tiene una asignación satisfactoria.
+
+- Coloreamos T, F y B con tres colores distintos.
+- Para cada variable xi:
+  - si xi = verdadero, damos a vi el color T y a not_vi el color F
+  - si xi = falso, damos a vi el color F y a not_vi el color T
+
+Eso colorea correctamente todos los gadgets de variable.
+
+Ahora consideremos una cláusula Cj = (a or b or c).
+
+Como la asignación satisface phi, en cada cláusula al menos uno de los literales a, b o c es verdadero.
+
+Entonces, por la propiedad del gadget OR, ese gadget puede colorearse de modo que su salida tenga color T.
+
+Como esto vale para cada cláusula, todo el grafo G_phi queda 3-coloreado legalmente.
+
+Por tanto, G_phi es 3-coloreable.
+
+###### (<=) Si G_phi es 3-coloreable, entonces phi es satisfacible
+
+Supongamos ahora que G_phi admite una 3-coloración válida.
+
+- El triángulo T-F-B usa tres colores distintos.
+- En cada gadget de variable, vi y not_vi no pueden usar el color B y además deben tener colores distintos.
+- Por tanto, uno queda con T y el otro con F.
+
+Eso define una asignación booleana consistente para cada variable.
+
+Ahora miremos cualquier cláusula Cj = (a or b or c).
+
+La salida del gadget de cláusula está conectada a F y a B, así que no puede tomar esos colores.
+Entonces su color debe ser T.
+
+Pero por la propiedad del gadget OR, eso solo es posible si al menos una de las entradas a, b o c tiene color T.
+
+Por tanto, en cada cláusula al menos un literal es verdadero.
+
+Luego todas las cláusulas se satisfacen y phi es satisfacible.
+
+###### Conclusión
+
+Se ha construido en tiempo polinomial un grafo G_phi tal que:
+
+phi es satisfacible si y solo si G_phi es 3-coloreable.
+
+Por tanto:
+
+3-SAT <=p 3-COLORING
+
+Como 3-SAT es NP-completo, se concluye que **3-COLORING es NP-Hard**.
+
+Además, como 3-COLORING pertenece a NP, concluimos finalmente que:
+
+**3-COLORING es NP-completo.**
 
 #### Reducción a coloreo de grafos
 
@@ -148,9 +359,33 @@ Luego de esta demostración, reducimos nuestro problema de asignación de bloque
 - Se dibuja una arista de conflicto entre dos nodos si las clases comparten el **mismo grupo** o el **mismo docente**; así reflejamos que no pueden ocurrir en el **mismo bloque de tiempo**.
 - Colorear el grafo con **k** colores equivale a asignar a **k** bloques de tiempo de manera que no existan conflictos, cumpliendo así todas las restricciones.
 
-Esta reducción permite aplicar algoritmos de coloreo de grafos como **Greedy**, **DSATUR** y **Backtracking** para obtener horarios válidos.
+Por eso tiene sentido usar aquí los mismos algoritmos de coloreo (**heurísticos** y **exactos**) que vimos antes: si obtenemos un coloreo válido con **k** colores, ese resultado se lee directamente como un **horario sin conflictos** en **k** bloques.
 
-De esta forma, se ha resuelto la primera tarea planteada en nuestro Objetivo.
+#### Modelado como grafo de conflictos
+
+El conjunto de clases de la Tabla 1 se representa como un **grafo no dirigido de conflictos**: hay arista entre dos clases si comparten **grupo** o **docente**. Para almacenarlo de forma compacta usamos **listas de adyacencia**: por cada vértice guardamos sus vecinos (en ambos sentidos, porque el grafo es no dirigido).
+
+**Vértices:** `A, B, C, D, E, F, G, H, I` (una clase por letra).
+
+**Listas de adyacencia** (formato `vértice → vecinos`):
+
+```
+A → B, C, D, G
+B → A, C, E, H
+C → A, B, F, I
+D → A, E, F, G
+E → B, D, F, H
+F → C, D, E, I
+G → A, D, H, I
+H → B, E, G, I
+I → C, F, G, H
+```
+
+##### ¿Por qué listas de adyacencia y no matriz de adyacencia?
+
+En este problema el grafo de conflictos suele ser **ralo** (`m` mucho menor que `n²`). Con **listas**, localizar el contenedor del vecindario de un vértice es `O(1)` y **recorrer sus vecinos** cuesta `O(grado(v))`; al recorrer todas las aristas (por ejemplo para comprobar colores en cada extremo), el trabajo total es **`O(n + m)`**, con `m` el número de aristas.
+
+Con una **matriz `n × n`**, encontrar vecinos de `v` mirando toda la fila cuesta **`O(n)`** aunque `v` tenga pocos vecinos; repetir eso para todos los vértices lleva a **`O(n²)`** incluso cuando el grafo es ralo. Por eso conviene la lista de adyacencia frente a la matriz en este escenario.
 
 ### Tarea 2
 
@@ -164,6 +399,8 @@ Construir la representación gráfica del grafo para su procesamiento.
 Aplicar un algoritmo Greedy (paso a paso), dibujando el grafo de conflictos generado considerando el conjunto de datos de la Tabla 1 con el orden: B, A, H, F, I, E, D, C, G.
 
 #### Ejecución
+
+El **Greedy de coloreo** recorre los nodos en ese orden; al llegar a un nodo **v**, mira solo los **vecinos que ya quedaron coloreados** en pasos anteriores, anota los colores que usan y asigna a **v** el **menor color entero no usado** entre esos vecinos (típicamente empezando en **0**). Así cada paso es local y rápido, pero el resultado **depende del orden**: puede usar más colores que el óptimo aunque exista un coloreo con menos colores.
 
 Orden de visita solicitado:
 
@@ -220,6 +457,59 @@ Coloración final:
 Aplicar cualquier otro algoritmo de coloreo de grafos para compararlo con el algoritmo Greedy, considere los mismos datos de la Tabla 1 y coloree el grafo resultante.
 
 #### Ejecución
+
+Elegimos el algoritmo DSATUR porque selecciona primero los nodos con más colores distintos entre sus vecinos, lo que suele reducir la cantidad total de colores (bloques de tiempo) necesarios respecto a Greedy. Además, DSATUR facilita la incorporación de restricciones adicionales, como la disponibilidad de docentes en bloques de tiempo que se trata en la **Pregunta 7**.
+
+##### Demostración
+
+Queremos probar que existe un grafo `G` y un orden de visita para Greedy tal que:
+
+`colores(Greedy) > colores(DSATUR)`.
+
+Consideremos:
+
+- `V = {A, B, C, D, E}`
+- `E = {AB, AC, BC, BD, BE, CE, DE}`
+
+`{A, B, C}` es un `K_3`, por lo que `chi(G) >= 3`.
+
+Además, existe una 3-coloración válida, por ejemplo:
+
+- `B -> 0`
+- `C -> 1`
+- `A -> 2`
+- `E -> 2`
+- `D -> 1`
+
+Por tanto, `chi(G) = 3`.
+
+**Greedy con orden desfavorable**
+
+Tomemos el orden: `A, D, C, E, B`.
+
+1. `A`: sin vecinos coloreados, asigna `0`.
+2. `D`: sin vecinos coloreados, asigna `0`.
+3. `C`: vecino coloreado `A(0)`, asigna `1`.
+4. `E`: vecinos coloreados `C(1)` y `D(0)`, asigna `2`.
+5. `B`: vecinos coloreados `A(0), C(1), D(0), E(2)`, asigna `3`.
+
+Greedy usa `4` colores.
+
+**DSATUR en el mismo grafo**
+
+Usamos desempate por mayor grado y, si persiste empate, orden alfabético.
+
+1. `B` (grado 4) -> color `0`.
+2. Máxima saturación: `C, E` (1); mayor grado (3), elegimos `C` -> color `1`.
+3. `E` tiene saturación 2 (`{0,1}`) -> color `2`.
+4. `A` y `D` tienen saturación 2; elegimos `A` -> color `2`.
+5. `D` -> color `1`.
+
+DSATUR usa `3` colores, que coincide con `chi(G)`.
+
+Con esto queda demostrado que existe un caso donde Greedy (con mal orden) usa más colores que DSATUR.
+
+##### Aplicación al caso de estudio
 
 Orden de visita solicitado:
 
@@ -560,15 +850,20 @@ La pregunta queda resuelta y demostrada en la solución de la **Tarea 1**.
 #### Ejecución
 La respuesta se encuentra en la **Tarea 5**, donde se explica el número cromático `x(G)` como mínimo de bloques de tiempo.
 
-Para el caso de la Tabla 1, el mínimo es **4 bloques**.
+Para el caso de la Tabla 1, el mínimo es **3 bloques**.
 
 ### Pregunta 3
 ¿Qué algoritmo de coloreo produce soluciones de mejor calidad (menos bloques) bajo el mismo tiempo de cómputo?
 
 #### Ejecución
-Con los datos usados en este documento, **Greedy** y **DSATUR** alcanzan una solución válida con **4 bloques**.
+Con los datos usados en este documento, **DSATUR** obtiene una solución de mejor calidad: **3 bloques**, frente a **4 bloques** de **Greedy**.
 
-En general, **DSATUR** suele producir soluciones de mejor calidad (igual o menos colores que Greedy en muchos casos), pero con mayor costo computacional en esta implementación.
+Sin embargo, esta mejora no se logra con el mismo costo computacional. En esta implementación:
+
+- **Greedy:** `O(n + m)`
+- **DSATUR:** `O(n^2 log n + m)`
+
+En este caso **DSATUR** da mejor calidad, pero con mayor tiempo de cómputo; en general no garantiza siempre menos colores que Greedy.
 
 ### Pregunta 4
 ¿Cómo se valida que el horario resultante no contiene conflictos?
@@ -605,3 +900,8 @@ En práctica, se confirma el óptimo cuando:
 3. Además, se puede usar un límite inferior como el tamaño del clique máximo para reforzar la prueba.
 
 ### Pregunta 7
+
+
+## Referencias
+
+1. Chekuri, C., & Pitt, L. (2015, April 23). NP-completeness of 3-color and SAT [Diapositivas de clase]. CS 374: Algorithms & Models of Computation, University of Illinois Urbana-Champaign. <https://courses.grainger.illinois.edu/cs498374/sp2015/slides/24-3color-Cook-Levin.pdf>
