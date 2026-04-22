@@ -22,7 +22,6 @@ class ColorateWithDsaturDsiOptimized<T> {
 
   static const int _defaultPriority = 1 << 30;
 
-  /// [trace]: when `true`, logs a step-by-step trace to stdout (avoid on huge graphs).
   Map<T, int> call(
     Map<T, Set<T>> adjacency, {
     List<T>? visitOrder,

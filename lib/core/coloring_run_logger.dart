@@ -1,6 +1,4 @@
-// Wall-clock + Stopwatch helpers for coloring algorithm diagnostics.
 
-/// Prints ISO start time and returns a running stopwatch.
 Stopwatch startColoringRun(String algorithmTag) {
   final sw = Stopwatch()..start();
   // ignore: avoid_print
@@ -11,7 +9,6 @@ Stopwatch startColoringRun(String algorithmTag) {
   return sw;
 }
 
-/// Prints ISO end time, elapsed, |V|, max color index, and distinct color count.
 void finishColoringRun<T>(
   String algorithmTag,
   Stopwatch sw,

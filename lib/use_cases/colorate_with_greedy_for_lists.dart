@@ -97,7 +97,6 @@ class ColorateWithGreedyForLists<T> {
     return colorByNode;
   }
 
-  /// Normalize undirected adjacency graph to ensure all nodes are connected.
   Map<T, Set<T>> _normalizeUndirectedAdjacency(Map<T, Set<T>> adjacency) {
     final normalized = <T, Set<T>>{};
 
@@ -116,7 +115,6 @@ class ColorateWithGreedyForLists<T> {
     return normalized;
   }
 
-  /// Order graph nodes by degree in descending order.
   List<T> _defaultVisitOrder(Map<T, Set<T>> adjacency) {
     final order = adjacency.keys.toList();
 

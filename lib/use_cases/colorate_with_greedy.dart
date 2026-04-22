@@ -3,7 +3,6 @@ import 'package:graph_solver/core/coloring_run_logger.dart';
 class ColorateWithGreedy<T> {
   const ColorateWithGreedy();
 
-  /// [trace]: when `true`, logs a step-by-step trace to stdout.
   Map<T, int> call(
     Map<T, Set<T>> adjacency, {
     List<T>? visitOrder,
@@ -68,7 +67,6 @@ class ColorateWithGreedy<T> {
     return colorByNode;
   }
 
-  /// Normalize undirected adjacency graph to ensure all nodes are connected.
   Map<T, Set<T>> _normalizeUndirectedAdjacency(Map<T, Set<T>> adjacency) {
     final normalized = <T, Set<T>>{};
 
@@ -87,7 +85,6 @@ class ColorateWithGreedy<T> {
     return normalized;
   }
 
-  /// Order graph nodes by degree in descending order.
   List<T> _buildVisitOrder(Map<T, Set<T>> adjacency, List<T>? customOrder) {
     final order = <T>[];
     final seen = <T>{};

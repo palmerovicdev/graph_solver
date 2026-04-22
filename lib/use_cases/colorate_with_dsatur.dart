@@ -3,7 +3,6 @@ import 'package:graph_solver/core/coloring_run_logger.dart';
 class ColorateWithDsatur<T> {
   const ColorateWithDsatur();
 
-  /// [trace]: when `true`, logs a step-by-step trace to stdout.
   Map<T, int> call(
     Map<T, Set<T>> adjacency, {
     List<T>? visitOrder,
@@ -96,7 +95,6 @@ class ColorateWithDsatur<T> {
     return colorByNode;
   }
 
-  /// Pick the next node to color based on saturation and degree.
   T _pickNextNode(
     Set<T> uncolored,
     Map<T, Set<T>> adjacency,
@@ -158,7 +156,6 @@ class ColorateWithDsatur<T> {
     return priorityByNode;
   }
 
-  /// Normalize undirected adjacency graph to ensure all nodes are connected.
   Map<T, Set<T>> _normalizeUndirectedAdjacency(Map<T, Set<T>> adjacency) {
     final normalized = <T, Set<T>>{};
 
