@@ -4,4 +4,5 @@ enum ColoringMethod {
   backtracking,
   greedyForLists,
   backtrackingForLists,
+  dsaturDsiOptimized,
 }

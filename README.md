@@ -240,7 +240,11 @@ Aplicar cualquier otro algoritmo de coloreo de grafos para compararlo con el alg
 
 #### Ejecución
 
-Elegimos el algoritmo DSATUR porque selecciona primero los nodos con más colores distintos entre sus vecinos, lo que suele reducir la cantidad total de colores (bloques de tiempo) necesarios respecto a Greedy. Además, DSATUR facilita la incorporación de restricciones adicionales, como la disponibilidad de docentes en bloques de tiempo que se trata en la **Pregunta 7**.
+Elegimos el algoritmo **DSATUR** porque, en cada paso, selecciona un vértice con **máximo grado de saturación**, donde la saturación de un vértice se define como el número de colores distintos presentes en sus vecinos ya coloreados (Brélaz, 1979, p. 252). Por tanto, antes de asignar color a un vértice `v`, existen al menos `sat(v)` colores que quedan prohibidos para `v`, ya que esos colores ya aparecen en vértices adyacentes y no pueden repetirse en una coloración propia (Brélaz, 1979, p. 252).
+
+De esta forma, si un vértice tiene mayor saturación que otro, entonces dispone de un conjunto de colores factibles más restringido en ese instante. En ese sentido, **DSATUR** realiza una selección más informada que un **Greedy** simple con orden fijo, porque no decide según una lista preestablecida, sino según el nivel real de restricción que va apareciendo durante la construcción de la coloración (Brélaz, 1979, p. 252).
+
+Esto no implica que **DSATUR** sea siempre óptimo ni que siempre use menos colores que cualquier variante de **Greedy**. Sin embargo, el propio trabajo de Brélaz lo presenta como un método heurístico eficiente y los resultados experimentales reportados muestran que **DSATUR** se encuentra entre los métodos heurísticos de mejor desempeño, lo que ayuda a explicar por qué con frecuencia produce coloraciones de alta calidad en la práctica (Brélaz, 1979, pp. 251-252, 254, 256).
 
 ##### Demostración
 
@@ -686,4 +690,4 @@ En práctica, se confirma el óptimo cuando:
 
 ## Referencias
 
-1. Chekuri, C., & Pitt, L. (2015, April 23). NP-completeness of 3-color and SAT [Diapositivas de clase]. CS 374: Algorithms & Models of Computation, University of Illinois Urbana-Champaign. <https://courses.grainger.illinois.edu/cs498374/sp2015/slides/24-3color-Cook-Levin.pdf>
+1. Brélaz, D. (1979, April). New methods to color the vertices of a graph. *Communications of the ACM, 22*(4), 251–256. <https://dl.acm.org/doi/epdf/10.1145/359094.359101>

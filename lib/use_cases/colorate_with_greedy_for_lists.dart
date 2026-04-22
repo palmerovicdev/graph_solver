@@ -1,3 +1,5 @@
+import 'package:graph_solver/core/coloring_run_logger.dart';
+
 class ColorateWithGreedyForLists<T> {
   const ColorateWithGreedyForLists();
 
@@ -6,16 +8,20 @@ class ColorateWithGreedyForLists<T> {
     required Map<T, List<int>> allowedColorsByNode,
     List<T>? visitOrder,
   }) {
+    final sw = startColoringRun('GreedyForLists');
+
     final normalized = _normalizeUndirectedAdjacency(adjacency);
     final order = visitOrder ?? _defaultVisitOrder(normalized);
     final orderSet = order.toSet();
 
     if (orderSet.length != order.length) {
+      finishColoringRun('GreedyForLists', sw, <T, int>{});
       throw ArgumentError('visitOrder must not contain duplicated nodes.');
     }
 
     final unknownInOrder = order.where((node) => !normalized.containsKey(node));
     if (unknownInOrder.isNotEmpty) {
+      finishColoringRun('GreedyForLists', sw, <T, int>{});
       throw ArgumentError(
         'visitOrder contains unknown nodes: ${unknownInOrder.join(', ')}.',
       );
@@ -25,6 +31,7 @@ class ColorateWithGreedyForLists<T> {
         .where((node) => !orderSet.contains(node))
         .toList();
     if (missingInOrder.isNotEmpty) {
+      finishColoringRun('GreedyForLists', sw, <T, int>{});
       throw ArgumentError(
         'visitOrder is missing nodes: ${missingInOrder.join(', ')}.',
       );
@@ -34,14 +41,24 @@ class ColorateWithGreedyForLists<T> {
         .where((node) => !allowedColorsByNode.containsKey(node))
         .toList();
     if (missingAllowedColors.isNotEmpty) {
+      finishColoringRun('GreedyForLists', sw, <T, int>{});
       throw ArgumentError(
         'Missing allowed colors for nodes: ${missingAllowedColors.join(', ')}.',
       );
     }
 
+    // ignore: avoid_print
+    print(
+      '[GreedyForLists] |V|=${normalized.length} visitOrder explicit=${visitOrder != null}',
+    );
+    // ignore: avoid_print
+    print('[GreedyForLists] order (${order.length}): $order');
+
     final colorByNode = <T, int>{};
+    var step = 0;
 
     for (final node in order) {
+      step++;
       final usedColors = <int>{};
       for (final neighbor in normalized[node] ?? <T>{}) {
         final neighborColor = colorByNode[neighbor];
@@ -61,12 +78,22 @@ class ColorateWithGreedyForLists<T> {
       }
 
       if (selectedColor == null) {
+        finishColoringRun('GreedyForLists', sw, <T, int>{});
         throw StateError('No valid list-coloring found.');
       }
+
+      // ignore: avoid_print
+      print(
+        '[GreedyForLists] --- step $step/${order.length} node=$node --- '
+        'blocked=$usedColors picked from allowed list -> $selectedColor',
+      );
 
       colorByNode[node] = selectedColor;
     }
 
+    // ignore: avoid_print
+    print('[GreedyForLists] Final coloring: $colorByNode');
+    finishColoringRun('GreedyForLists', sw, colorByNode);
     return colorByNode;
   }
 

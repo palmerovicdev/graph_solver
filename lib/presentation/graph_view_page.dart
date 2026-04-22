@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_force_directed_graph/flutter_force_directed_graph.dart';
+import 'package:graph_solver/core/super_graph_adjacency.dart';
 import 'package:graph_solver/core/utils/colors.dart';
 import 'package:graph_solver/domain/enums.dart';
 import 'package:graph_solver/presentation/widget/custom_graph.dart';
@@ -12,6 +13,7 @@ import 'package:graph_solver/presentation/widget/rule_groups_editor.dart';
 import 'package:graph_solver/use_cases/colorate_with_backtracking.dart';
 import 'package:graph_solver/use_cases/colorate_with_backtracking_for_lists.dart';
 import 'package:graph_solver/use_cases/colorate_with_dsatur.dart';
+import 'package:graph_solver/use_cases/colorate_with_dsatur_dsi_optimized.dart';
 import 'package:graph_solver/use_cases/colorate_with_greedy.dart';
 import 'package:graph_solver/use_cases/colorate_with_greedy_for_lists.dart';
 
@@ -47,6 +49,9 @@ class _GraphViewPageState extends State<GraphViewPage> {
   _colorateWithBacktrackingForLists =
       ColorateWithBacktrackingForLists<String>();
 
+  static const ColorateWithDsaturDsiOptimized<String>
+  _colorateWithDsaturDsiOptimized = ColorateWithDsaturDsiOptimized<String>();
+
   static const List<Color> _palette = [
     Colors.red,
     Colors.green,
@@ -62,10 +67,14 @@ class _GraphViewPageState extends State<GraphViewPage> {
 
   late Map<String, List<String>> _ruleGroups;
   late Map<String, Set<String>> _adjacency;
+  late Map<String, Set<String>> _hyperPopulatedAdjacency;
   late ForceDirectedGraph<String> _layoutGraph;
   late Map<String, Color> _colors;
   String _errorMessage = '';
   ColoringMethod _selectedColoringMethod = ColoringMethod.greedy;
+  /// When true, coloring runs on the stress graph; the canvas still shows the course graph only.
+  bool _hyperGraphMode = false;
+  String _hyperColoringSummary = '';
 
   static Map<String, List<String>> _cloneGroupMap(Map<String, List<String>> m) {
     return m.map((k, v) => MapEntry(k, List<String>.from(v)));
@@ -81,17 +90,21 @@ class _GraphViewPageState extends State<GraphViewPage> {
 
   void _recomputeAdjacencyAndGraph() {
     _adjacency = _buildAdjacencyFromRuleGroups(_ruleGroups);
+    _hyperPopulatedAdjacency = SuperGraphAdjacency.build();
     for (final n in _standaloneNodes) {
       _adjacency.putIfAbsent(n, () => <String>{});
     }
     _nodeColorConstraints.removeWhere((k, _) => !_adjacency.containsKey(k));
-    _layoutGraph = _buildGraph();
+    _layoutGraph = _buildGraph(_adjacency);
   }
 
   bool get _usesListColoringConstraints =>
       _nodeColorConstraints.values.any((list) => list.isNotEmpty);
 
   void _normalizeSelectedMethodForListConstraints() {
+    if (_usesListColoringConstraints) {
+      _hyperGraphMode = false;
+    }
     if (!_usesListColoringConstraints) {
       _selectedColoringMethod = ColoringMethod.greedy;
       return;
@@ -133,17 +146,102 @@ class _GraphViewPageState extends State<GraphViewPage> {
   void _refreshColors({bool firstTime = false}) {
     if (firstTime) {
       _colors = <String, Color>{};
+      _hyperColoringSummary = '';
       _errorMessage = '';
       return;
     }
     _normalizeSelectedMethodForListConstraints();
+    _applyColoringOrError();
+  }
+
+  void _applyColoringOrError() {
     try {
-      _colors = _buildColors(_selectedColoringMethod);
+      final bundle = _buildColoringDisplay(_selectedColoringMethod);
+      _colors = bundle.displayColors;
+      _hyperColoringSummary = bundle.hyperSummary;
       _errorMessage = '';
     } catch (e) {
       _colors = <String, Color>{};
+      _hyperColoringSummary = '';
       _errorMessage = e.toString();
     }
+  }
+
+  Map<String, Set<String>> get _coloringAdjacency =>
+      _hyperGraphMode ? _hyperPopulatedAdjacency : _adjacency;
+
+  List<String>? get _visitOrderForColoring =>
+      _hyperGraphMode ? null : _buildCustomVisitOrder;
+
+  /// Colors for the force-directed canvas plus an optional stress-run summary line.
+  ({Map<String, Color> displayColors, String hyperSummary}) _buildColoringDisplay(
+    ColoringMethod method,
+  ) {
+    if (_usesListColoringConstraints) {
+      final allowed = _effectiveAllowedColorsByNode();
+      final colorIndexByNode = method == ColoringMethod.backtrackingForLists
+          ? _colorateWithBacktrackingForLists(
+              _adjacency,
+              allowedColorsByNode: allowed,
+            )
+          : _colorateWithGreedyForLists(
+              _adjacency,
+              allowedColorsByNode: allowed,
+            );
+      final displayColors = colorIndexByNode.map((node, colorIndex) {
+        return MapEntry(node, _colorForIndex(colorIndex));
+      });
+      return (displayColors: displayColors, hyperSummary: '');
+    }
+
+    final adj = _coloringAdjacency;
+    final visitOrder = _visitOrderForColoring;
+
+    final colorIndexByNode = switch (method) {
+      ColoringMethod.greedy => _colorateWithGreedy(
+        adj,
+        visitOrder: visitOrder,
+      ),
+      ColoringMethod.dsatur => _colorateWithDsatur(
+        adj,
+        visitOrder: visitOrder,
+      ),
+      ColoringMethod.backtracking => _colorateWithBacktracking(adj),
+      ColoringMethod.greedyForLists => _colorateWithGreedyForLists(
+        _adjacency,
+        allowedColorsByNode: _allowedColorsByNode(),
+      ),
+      ColoringMethod.backtrackingForLists => _colorateWithBacktrackingForLists(
+        _adjacency,
+        allowedColorsByNode: _allowedColorsByNode(),
+      ),
+      ColoringMethod.dsaturDsiOptimized => _colorateWithDsaturDsiOptimized(
+        adj,
+        visitOrder: visitOrder,
+      ),
+    };
+
+    if (_hyperGraphMode) {
+      final maxColorIndex = colorIndexByNode.values.fold<int>(
+        -1,
+        (m, c) => c > m ? c : m,
+      );
+      final colorCount = maxColorIndex < 0 ? 0 : maxColorIndex + 1;
+      final summary =
+          'Stress graph coloring: |V|=${colorIndexByNode.length}, '
+          'used $colorCount color index(es)'
+          '${maxColorIndex >= 0 ? ' (0..$maxColorIndex)' : ''}. '
+          'Canvas shows the course graph only.';
+      final displayColors = <String, Color>{
+        for (final id in _adjacency.keys) id: const Color(0xFFB0BEC5),
+      };
+      return (displayColors: displayColors, hyperSummary: summary);
+    }
+
+    final displayColors = colorIndexByNode.map((node, colorIndex) {
+      return MapEntry(node, _colorForIndex(colorIndex));
+    });
+    return (displayColors: displayColors, hyperSummary: '');
   }
 
   Map<String, List<int>> _allowedColorsByNode() {
@@ -209,20 +307,20 @@ class _GraphViewPageState extends State<GraphViewPage> {
     });
   }
 
-  ForceDirectedGraph<String> _buildGraph() {
+  ForceDirectedGraph<String> _buildGraph(Map<String, Set<String>> adjacency) {
     final graph = ForceDirectedGraph<String>(
-      config: const GraphConfig(
+      config: GraphConfig(
         length: 90,
-        repulsion: 120,
-        repulsionRange: 370,
+        repulsion: adjacency.length > 200 ? 40 : 120,
+        repulsionRange: adjacency.length > 200 ? 120 : 370,
         elasticity: 0.9,
-        scaling: 0.02,
+        scaling: adjacency.length > 200 ? 0.008 : 0.02,
         damping: 0.92,
-        minVelocity: 2.5,
+        minVelocity: adjacency.length > 200 ? 0.8 : 2.5,
       ),
     );
 
-    final labels = _adjacency.keys.toList()..sort();
+    final labels = adjacency.keys.toList()..sort();
     final nodes = <String, Node<String>>{};
 
     final radius = 120.0;
@@ -240,7 +338,7 @@ class _GraphViewPageState extends State<GraphViewPage> {
     final addedEdges = <String>{};
 
     for (final source in labels) {
-      final targets = (_adjacency[source] ?? const <String>{}).toList()..sort();
+      final targets = (adjacency[source] ?? const <String>{}).toList()..sort();
       for (final target in targets) {
         final sourceNode = nodes[source];
         final targetNode = nodes[target];
@@ -281,50 +379,6 @@ class _GraphViewPageState extends State<GraphViewPage> {
     return adjacency;
   }
 
-  Map<String, Color> _buildColors(ColoringMethod method) {
-    if (_usesListColoringConstraints) {
-      final allowed = _effectiveAllowedColorsByNode();
-      final colorIndexByNode = method == ColoringMethod.backtrackingForLists
-          ? _colorateWithBacktrackingForLists(
-              _adjacency,
-              allowedColorsByNode: allowed,
-            )
-          : _colorateWithGreedyForLists(
-              _adjacency,
-              allowedColorsByNode: allowed,
-            );
-      return colorIndexByNode.map((node, colorIndex) {
-        final color = _colorForIndex(colorIndex);
-        return MapEntry(node, color);
-      });
-    }
-
-    final colorIndexByNode = switch (method) {
-      ColoringMethod.greedy => _colorateWithGreedy(
-        _adjacency,
-        visitOrder: _buildCustomVisitOrder,
-      ),
-      ColoringMethod.dsatur => _colorateWithDsatur(
-        _adjacency,
-        visitOrder: _buildCustomVisitOrder,
-      ),
-      ColoringMethod.backtracking => _colorateWithBacktracking(_adjacency),
-      ColoringMethod.greedyForLists => _colorateWithGreedyForLists(
-        _adjacency,
-        allowedColorsByNode: _allowedColorsByNode(),
-      ),
-      ColoringMethod.backtrackingForLists => _colorateWithBacktrackingForLists(
-        _adjacency,
-        allowedColorsByNode: _allowedColorsByNode(),
-      ),
-    };
-
-    return colorIndexByNode.map((node, colorIndex) {
-      final color = _colorForIndex(colorIndex);
-      return MapEntry(node, color);
-    });
-  }
-
   List<String> get _buildCustomVisitOrder {
     final order = {'B', 'A', 'H', 'F', 'I', 'E', 'D', 'C', 'G'};
     final nodes = _adjacency.keys.toSet();
@@ -344,23 +398,31 @@ class _GraphViewPageState extends State<GraphViewPage> {
   }
 
   void _changeColoringMethod(ColoringMethod method) {
-    if (_selectedColoringMethod == method) {
-      return;
-    }
     if (_usesListColoringConstraints &&
         method != ColoringMethod.greedyForLists &&
         method != ColoringMethod.backtrackingForLists) {
       return;
     }
 
+    if (_selectedColoringMethod == method) {
+      return;
+    }
+
     setState(() {
       _selectedColoringMethod = method;
-      try {
-        _colors = _buildColors(method);
-        _errorMessage = '';
-      } catch (e) {
-        _errorMessage = e.toString();
-      }
+      _layoutGraph = _buildGraph(_adjacency);
+      _applyColoringOrError();
+    });
+  }
+
+  void _toggleHyperGraphMode() {
+    if (_usesListColoringConstraints) {
+      return;
+    }
+    setState(() {
+      _hyperGraphMode = !_hyperGraphMode;
+      _layoutGraph = _buildGraph(_adjacency);
+      _applyColoringOrError();
     });
   }
 
@@ -382,6 +444,12 @@ class _GraphViewPageState extends State<GraphViewPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   spacing: 12,
                   children: [
+                    MethodButton(
+                      label: 'Stress graph (color only)',
+                      selected: _hyperGraphMode,
+                      onPressed: _toggleHyperGraphMode,
+                    ),
+                    const SizedBox(height: 12),
                     if (_usesListColoringConstraints) ...[
                       MethodButton(
                         label: 'Greedy',
@@ -415,6 +483,14 @@ class _GraphViewPageState extends State<GraphViewPage> {
                             _selectedColoringMethod == ColoringMethod.dsatur,
                         onPressed: () =>
                             _changeColoringMethod(ColoringMethod.dsatur),
+                      ),
+                      MethodButton(
+                        label: 'DSATUR DSI Optimized',
+                        selected: _selectedColoringMethod ==
+                            ColoringMethod.dsaturDsiOptimized,
+                        onPressed: () => _changeColoringMethod(
+                          ColoringMethod.dsaturDsiOptimized,
+                        ),
                       ),
                       MethodButton(
                         label: 'Backtracking',
@@ -469,6 +545,33 @@ class _GraphViewPageState extends State<GraphViewPage> {
                           ),
                         ),
                       ),
+                      if (_hyperGraphMode &&
+                          _hyperColoringSummary.isNotEmpty &&
+                          _errorMessage.isEmpty)
+                        Positioned(
+                          left: 12,
+                          top: 12,
+                          right: 12,
+                          child: Material(
+                            elevation: 2,
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.white.withValues(alpha: 0.94),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              child: Text(
+                                _hyperColoringSummary,
+                                style: TextStyle(
+                                  color: Colors.blueGrey.shade800,
+                                  fontSize: 13,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       if (_errorMessage.isNotEmpty)
                         Center(
                           child: Padding(

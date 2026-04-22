@@ -1,19 +1,46 @@
+import 'package:graph_solver/core/coloring_run_logger.dart';
+
 class ColorateWithGreedy<T> {
   const ColorateWithGreedy();
 
-  Map<T, int> call(Map<T, Set<T>> adjacency, {List<T>? visitOrder}) {
+  /// [trace]: when `true`, logs a step-by-step trace to stdout.
+  Map<T, int> call(
+    Map<T, Set<T>> adjacency, {
+    List<T>? visitOrder,
+    bool trace = false,
+  }) {
+    final sw = startColoringRun('Greedy');
+
+    void emitTrace(String message) {
+      if (trace) {
+        // ignore: avoid_print
+        print('[Greedy] $message');
+      }
+    }
+
     final normalized = _normalizeUndirectedAdjacency(adjacency);
     if (normalized.isEmpty) {
+      emitTrace('Empty graph after normalization.');
+      finishColoringRun('Greedy', sw, <T, int>{});
       return <T, int>{};
     }
 
-    print('visitOrder: $visitOrder');
-    print('normalized: $normalized');
+    var edgeCount = 0;
+    for (final e in normalized.entries) {
+      edgeCount += e.value.length;
+    }
+    edgeCount ~/= 2;
+    emitTrace('Graph |V|=${normalized.length} |E|=$edgeCount (undirected).');
+    emitTrace('visitOrder input=$visitOrder');
 
     final order = _buildVisitOrder(normalized, visitOrder);
+    emitTrace('visit sequence (${order.length} nodes): $order');
+
     final colorByNode = <T, int>{};
+    var step = 0;
 
     for (final node in order) {
+      step++;
       final usedColors = <int>{};
       for (final neighbor in normalized[node] ?? <T>{}) {
         final neighborColor = colorByNode[neighbor];
@@ -21,15 +48,23 @@ class ColorateWithGreedy<T> {
           usedColors.add(neighborColor);
         }
       }
+      final usedSorted = usedColors.toList()..sort();
+      emitTrace(
+        '--- step $step/${order.length} node=$node --- '
+        'blocked colors: $usedSorted',
+      );
 
       var selectedColor = 0;
       while (usedColors.contains(selectedColor)) {
         selectedColor++;
       }
+      emitTrace('  assign smallest free color index: $selectedColor');
 
       colorByNode[node] = selectedColor;
     }
 
+    emitTrace('Final coloring: $colorByNode');
+    finishColoringRun('Greedy', sw, colorByNode);
     return colorByNode;
   }
 

@@ -1,3 +1,5 @@
+import 'package:graph_solver/core/coloring_run_logger.dart';
+
 class ColorateWithBacktracking<T> {
   const ColorateWithBacktracking();
 
@@ -14,16 +16,37 @@ class ColorateWithBacktracking<T> {
       );
     }
 
+    final sw = startColoringRun('Backtracking');
+
     final normalized = _normalizeUndirectedAdjacency(adjacency);
     if (normalized.isEmpty) {
+      // ignore: avoid_print
+      print('[Backtracking] Empty graph after normalization.');
+      finishColoringRun('Backtracking', sw, <T, int>{});
       return <T, int>{};
     }
 
+    var edgeCount = 0;
+    for (final e in normalized.entries) {
+      edgeCount += e.value.length;
+    }
+    edgeCount ~/= 2;
+    // ignore: avoid_print
+    print(
+      '[Backtracking] Graph |V|=${normalized.length} |E|=$edgeCount '
+      'maxColors=${maxColors ?? '(unbounded, try 1..n)'}',
+    );
+
     final order = _buildVisitOrder(normalized, visitOrder);
+    // ignore: avoid_print
+    print('[Backtracking] visit sequence (${order.length} nodes): $order');
+
     final colorByNode = <T, int>{};
     final upperBound = maxColors ?? normalized.length;
 
     for (var colorCount = 1; colorCount <= upperBound; colorCount++) {
+      // ignore: avoid_print
+      print('[Backtracking] --- try coloring with k=$colorCount ---');
       colorByNode.clear();
       final solved = _search(
         nodeIndex: 0,
@@ -33,10 +56,18 @@ class ColorateWithBacktracking<T> {
         colorCount: colorCount,
       );
       if (solved) {
+        // ignore: avoid_print
+        print('[Backtracking] Success with k=$colorCount.');
+        // ignore: avoid_print
+        print('[Backtracking] Final coloring: $colorByNode');
+        finishColoringRun('Backtracking', sw, Map<T, int>.from(colorByNode));
         return Map<T, int>.from(colorByNode);
       }
+      // ignore: avoid_print
+      print('[Backtracking] No solution with k=$colorCount, incrementing k.');
     }
 
+    finishColoringRun('Backtracking', sw, <T, int>{});
     if (maxColors != null) {
       throw StateError('No valid coloring found with maxColors=$maxColors.');
     }

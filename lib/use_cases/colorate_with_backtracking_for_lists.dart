@@ -1,3 +1,5 @@
+import 'package:graph_solver/core/coloring_run_logger.dart';
+
 class ColorateWithBacktrackingForLists<T> {
   const ColorateWithBacktrackingForLists();
 
@@ -6,8 +8,13 @@ class ColorateWithBacktrackingForLists<T> {
     required Map<T, List<int>> allowedColorsByNode,
     List<T>? visitOrder,
   }) {
+    final sw = startColoringRun('BacktrackingForLists');
+
     final normalized = _normalizeUndirectedAdjacency(adjacency);
     if (normalized.isEmpty) {
+      // ignore: avoid_print
+      print('[BacktrackingForLists] Empty graph after normalization.');
+      finishColoringRun('BacktrackingForLists', sw, <T, int>{});
       return <T, int>{};
     }
 
@@ -17,10 +24,17 @@ class ColorateWithBacktrackingForLists<T> {
         .toList();
 
     if (missingAllowedColors.isNotEmpty) {
+      finishColoringRun('BacktrackingForLists', sw, <T, int>{});
       throw ArgumentError(
         'Missing allowed colors for nodes: ${missingAllowedColors.join(', ')}.',
       );
     }
+
+    // ignore: avoid_print
+    print(
+      '[BacktrackingForLists] |V|=${normalized.length} '
+      'order (${order.length}): $order',
+    );
 
     final colorByNode = <T, int>{};
     final solved = _search(
@@ -32,9 +46,19 @@ class ColorateWithBacktrackingForLists<T> {
     );
 
     if (solved) {
+      // ignore: avoid_print
+      print('[BacktrackingForLists] Search succeeded.');
+      // ignore: avoid_print
+      print('[BacktrackingForLists] Final coloring: $colorByNode');
+      finishColoringRun(
+        'BacktrackingForLists',
+        sw,
+        Map<T, int>.from(colorByNode),
+      );
       return Map<T, int>.from(colorByNode);
     }
 
+    finishColoringRun('BacktrackingForLists', sw, <T, int>{});
     throw StateError('No valid list-coloring found.');
   }
 
