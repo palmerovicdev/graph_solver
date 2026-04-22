@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_force_directed_graph/flutter_force_directed_graph.dart';
 import 'package:graph_solver/core/super_graph_adjacency.dart';
@@ -16,6 +17,7 @@ import 'package:graph_solver/use_cases/colorate_with_dsatur.dart';
 import 'package:graph_solver/use_cases/colorate_with_dsatur_dsi_optimized.dart';
 import 'package:graph_solver/use_cases/colorate_with_greedy.dart';
 import 'package:graph_solver/use_cases/colorate_with_greedy_for_lists.dart';
+import 'package:graph_solver/use_cases/hyper_graph_benchmark.dart';
 
 class GraphViewPage extends StatefulWidget {
   const GraphViewPage({super.key});
@@ -61,6 +63,11 @@ class _GraphViewPageState extends State<GraphViewPage> {
 
   static const int _minColorUniverseSize = 8;
   static const int _maxColorUniverseSize = 64;
+  static const int _defaultBenchmarkRuns = 20;
+  static const int _defaultBenchmarkVertices =
+      SuperGraphAdjacency.defaultVertexCount;
+  static const double _defaultBenchmarkDensity =
+      SuperGraphAdjacency.defaultDesiredDensity;
 
   final Set<String> _standaloneNodes = {};
   final Map<String, List<int>> _nodeColorConstraints = {};
@@ -72,9 +79,21 @@ class _GraphViewPageState extends State<GraphViewPage> {
   late Map<String, Color> _colors;
   String _errorMessage = '';
   ColoringMethod _selectedColoringMethod = ColoringMethod.greedy;
+
   /// When true, coloring runs on the stress graph; the canvas still shows the course graph only.
   bool _hyperGraphMode = false;
   String _hyperColoringSummary = '';
+  bool _isRunningHyperBenchmark = false;
+  String _hyperBenchmarkTable = '';
+  String _hyperBenchmarkError = '';
+  String _hyperBenchmarkTitle = 'Hyper benchmark';
+  final TextEditingController _benchmarkRunsController = TextEditingController(
+    text: '$_defaultBenchmarkRuns',
+  );
+  final TextEditingController _benchmarkVerticesController =
+      TextEditingController(text: '$_defaultBenchmarkVertices');
+  final TextEditingController _benchmarkDensityController =
+      TextEditingController(text: '$_defaultBenchmarkDensity');
 
   static Map<String, List<String>> _cloneGroupMap(Map<String, List<String>> m) {
     return m.map((k, v) => MapEntry(k, List<String>.from(v)));
@@ -86,6 +105,14 @@ class _GraphViewPageState extends State<GraphViewPage> {
     _ruleGroups = {..._cloneGroupMap(_gGroups), ..._cloneGroupMap(_tGroups)};
     _recomputeAdjacencyAndGraph();
     _refreshColors(firstTime: true);
+  }
+
+  @override
+  void dispose() {
+    _benchmarkRunsController.dispose();
+    _benchmarkVerticesController.dispose();
+    _benchmarkDensityController.dispose();
+    super.dispose();
   }
 
   void _recomputeAdjacencyAndGraph() {
@@ -174,9 +201,8 @@ class _GraphViewPageState extends State<GraphViewPage> {
       _hyperGraphMode ? null : _buildCustomVisitOrder;
 
   /// Colors for the force-directed canvas plus an optional stress-run summary line.
-  ({Map<String, Color> displayColors, String hyperSummary}) _buildColoringDisplay(
-    ColoringMethod method,
-  ) {
+  ({Map<String, Color> displayColors, String hyperSummary})
+  _buildColoringDisplay(ColoringMethod method) {
     if (_usesListColoringConstraints) {
       final allowed = _effectiveAllowedColorsByNode();
       final colorIndexByNode = method == ColoringMethod.backtrackingForLists
@@ -198,14 +224,8 @@ class _GraphViewPageState extends State<GraphViewPage> {
     final visitOrder = _visitOrderForColoring;
 
     final colorIndexByNode = switch (method) {
-      ColoringMethod.greedy => _colorateWithGreedy(
-        adj,
-        visitOrder: visitOrder,
-      ),
-      ColoringMethod.dsatur => _colorateWithDsatur(
-        adj,
-        visitOrder: visitOrder,
-      ),
+      ColoringMethod.greedy => _colorateWithGreedy(adj, visitOrder: visitOrder),
+      ColoringMethod.dsatur => _colorateWithDsatur(adj, visitOrder: visitOrder),
       ColoringMethod.backtracking => _colorateWithBacktracking(adj),
       ColoringMethod.greedyForLists => _colorateWithGreedyForLists(
         _adjacency,
@@ -426,6 +446,241 @@ class _GraphViewPageState extends State<GraphViewPage> {
     });
   }
 
+  _HyperBenchmarkUiConfig? _parseHyperBenchmarkUiConfig() {
+    final runsText = _benchmarkRunsController.text.trim();
+    final verticesText = _benchmarkVerticesController.text.trim();
+    final densityText = _benchmarkDensityController.text.trim().replaceAll(
+      ',',
+      '.',
+    );
+
+    final runs = int.tryParse(runsText);
+    if (runs == null || runs < 1) {
+      setState(() {
+        _hyperBenchmarkError = 'Runs must be an integer >= 1.';
+      });
+      return null;
+    }
+
+    final vertices = int.tryParse(verticesText);
+    if (vertices == null || vertices < 2) {
+      setState(() {
+        _hyperBenchmarkError = 'Vertices must be an integer >= 2.';
+      });
+      return null;
+    }
+
+    final density = double.tryParse(densityText);
+    if (density == null || density <= 0 || density > 1) {
+      setState(() {
+        _hyperBenchmarkError = 'Density must be a number in (0, 1].';
+      });
+      return null;
+    }
+
+    return _HyperBenchmarkUiConfig(
+      runs: runs,
+      vertices: vertices,
+      density: density,
+    );
+  }
+
+  Widget _buildBenchmarkConfigEditor() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blueGrey.shade100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 8,
+        children: [
+          Text(
+            'Benchmark config',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.blueGrey.shade700,
+            ),
+          ),
+          _buildBenchmarkInput(
+            label: 'Vertices',
+            controller: _benchmarkVerticesController,
+            decimal: false,
+          ),
+          _buildBenchmarkInput(
+            label: 'Density (0, 1]',
+            controller: _benchmarkDensityController,
+            decimal: true,
+          ),
+          _buildBenchmarkInput(
+            label: 'Runs',
+            controller: _benchmarkRunsController,
+            decimal: false,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBenchmarkInput({
+    required String label,
+    required TextEditingController controller,
+    required bool decimal,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 4,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade700),
+        ),
+        TextField(
+          controller: controller,
+          enabled: !_isRunningHyperBenchmark,
+          keyboardType: TextInputType.numberWithOptions(decimal: decimal),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.grey.shade100,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 8,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.blueGrey.shade400),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _runHyperGraphBenchmark() async {
+    if (_isRunningHyperBenchmark) {
+      return;
+    }
+
+    final config = _parseHyperBenchmarkUiConfig();
+    if (config == null) {
+      return;
+    }
+
+    setState(() {
+      _isRunningHyperBenchmark = true;
+      _hyperBenchmarkError = '';
+    });
+
+    try {
+      final request = HyperGraphBenchmarkRequest(
+        runs: config.runs,
+        vertices: config.vertices,
+        desiredDensity: config.density,
+        baseSeed: DateTime.now().microsecondsSinceEpoch,
+      );
+
+      final payload = await compute<Map<String, dynamic>, Map<String, dynamic>>(
+        runHyperGraphBenchmarkInIsolate,
+        request.toPayload(),
+      );
+      if (!mounted) {
+        return;
+      }
+
+      final result = HyperGraphBenchmarkResult.fromPayload(payload);
+      setState(() {
+        _hyperBenchmarkTable = result.markdownTable;
+        _hyperBenchmarkTitle =
+            'Hyper benchmark (${result.runs} runs, '
+            'V=${result.vertices}, '
+            'd=${result.desiredDensity.toStringAsFixed(3)})';
+        _isRunningHyperBenchmark = false;
+      });
+
+      await _showHyperBenchmarkDialog(
+        _hyperBenchmarkTable,
+        title: _hyperBenchmarkTitle,
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _hyperBenchmarkError = e.toString();
+      });
+    } finally {
+      if (mounted && _isRunningHyperBenchmark) {
+        setState(() {
+          _isRunningHyperBenchmark = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openLatestHyperBenchmarkTable() async {
+    if (_hyperBenchmarkTable.isEmpty) {
+      return;
+    }
+    await _showHyperBenchmarkDialog(
+      _hyperBenchmarkTable,
+      title: _hyperBenchmarkTitle,
+    );
+  }
+
+  Future<void> _showHyperBenchmarkDialog(
+    String tableText, {
+    required String title,
+  }) {
+    const tableStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 12,
+      height: 1.35,
+    );
+
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: 900,
+            height: 520,
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 860),
+                  child: SingleChildScrollView(
+                    child: SelectableText(tableText, style: tableStyle),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sortedNodes = _adjacency.keys.toList()..sort();
@@ -449,6 +704,25 @@ class _GraphViewPageState extends State<GraphViewPage> {
                       selected: _hyperGraphMode,
                       onPressed: _toggleHyperGraphMode,
                     ),
+                    _buildBenchmarkConfigEditor(),
+                    MethodButton(
+                      label: _isRunningHyperBenchmark
+                          ? 'Running benchmark...'
+                          : 'Run benchmark (compute)',
+                      selected: false,
+                      onPressed: _runHyperGraphBenchmark,
+                    ),
+                    if (_hyperBenchmarkTable.isNotEmpty)
+                      MethodButton(
+                        label: 'Open last benchmark table',
+                        selected: false,
+                        onPressed: _openLatestHyperBenchmarkTable,
+                      ),
+                    if (_hyperBenchmarkError.isNotEmpty)
+                      Text(
+                        _hyperBenchmarkError,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
                     const SizedBox(height: 12),
                     if (_usesListColoringConstraints) ...[
                       MethodButton(
@@ -486,7 +760,8 @@ class _GraphViewPageState extends State<GraphViewPage> {
                       ),
                       MethodButton(
                         label: 'DSATUR DSI Optimized',
-                        selected: _selectedColoringMethod ==
+                        selected:
+                            _selectedColoringMethod ==
                             ColoringMethod.dsaturDsiOptimized,
                         onPressed: () => _changeColoringMethod(
                           ColoringMethod.dsaturDsiOptimized,
@@ -627,4 +902,16 @@ class _GraphViewPageState extends State<GraphViewPage> {
       ),
     );
   }
+}
+
+final class _HyperBenchmarkUiConfig {
+  const _HyperBenchmarkUiConfig({
+    required this.runs,
+    required this.vertices,
+    required this.density,
+  });
+
+  final int runs;
+  final int vertices;
+  final double density;
 }

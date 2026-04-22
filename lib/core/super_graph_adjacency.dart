@@ -13,7 +13,7 @@ import 'dart:math';
 final class SuperGraphAdjacency {
   SuperGraphAdjacency._();
 
-  static const int defaultVertexCount = 1000;
+  static const int defaultVertexCount = 100;
 
   /// Default per-edge inclusion probability.
   static const double defaultDesiredDensity = 0.5;
